@@ -1,15 +1,3 @@
-locals {
-  glue_s3_targets = {
-    development = [
-      "s3://coat-${local.environment}-cur-v2-hourly/moj-cost-and-usage-reports/MOJ-CUR-V2-HOURLY/data/"
-    ]
-    production = [
-      "s3://coat-${local.environment}-cur-v2-hourly/moj-cost-and-usage-reports/MOJ-CUR-V2-HOURLY/data/",
-      "s3://coat-${local.environment}-cur-v2-hourly-enriched/"
-    ]
-  }
-}
-
 resource "aws_athena_workgroup" "coat_cur_report" {
   name = "coat_cur_report"
 
@@ -106,10 +94,8 @@ resource "aws_glue_crawler" "cur_v2_crawler" {
   database_name = aws_glue_catalog_database.cur_v2_database.name
   role          = aws_iam_role.glue_cur_role.arn
 
-  dynamic "s3_target" {
-    content {
+  s3_target {
       path = "s3://coat-${local.environment}-cur-v2-hourly/moj-cost-and-usage-reports/MOJ-CUR-V2-HOURLY/data/"
-    }
   }
 
   configuration = jsonencode({
@@ -150,7 +136,7 @@ export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey
 export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
 aws athena start-query-execution \
   --query-string "$(aws athena get-named-query --named-query-id ${aws_athena_named_query.fct_daily_cost.id} --query 'NamedQuery.QueryString' --output text)" \
-  --work-group ${aws_athena_workgroup.ctas_athena_workgroup.name} \
+  --work-group ${aws_athena_workgroup.coat_cur_report.name} \
   --result-configuration OutputLocation=s3://coat-${local.environment}-cur-v2-hourly/ctas/fct-daily-cost/ \
   --query-execution-context Database=${aws_glue_catalog_database.cur_v2_database.name} \
   --region ${data.aws_region.current.name}
